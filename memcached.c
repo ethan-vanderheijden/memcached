@@ -1848,6 +1848,10 @@ void server_stats(ADD_STAT add_stats, void *c) {
     APPEND_STAT("incr_hits", "%llu", (unsigned long long)slab_stats.incr_hits);
     APPEND_STAT("decr_misses", "%llu", (unsigned long long)thread_stats.decr_misses);
     APPEND_STAT("decr_hits", "%llu", (unsigned long long)slab_stats.decr_hits);
+    APPEND_STAT("mult_misses", "%llu", (unsigned long long)thread_stats.mult_misses);
+    APPEND_STAT("mult_hits", "%llu", (unsigned long long)slab_stats.mult_hits);
+    APPEND_STAT("div_misses", "%llu", (unsigned long long)thread_stats.div_misses);
+    APPEND_STAT("div_hits", "%llu", (unsigned long long)slab_stats.div_hits);
     APPEND_STAT("cas_misses", "%llu", (unsigned long long)thread_stats.cas_misses);
     APPEND_STAT("cas_hits", "%llu", (unsigned long long)slab_stats.cas_hits);
     APPEND_STAT("cas_badval", "%llu", (unsigned long long)slab_stats.cas_badval);
@@ -2265,7 +2269,7 @@ item* limited_get_locked(const char *key, size_t nkey, LIBEVENT_THREAD *t, bool 
  * returns a response string to send back to the client.
  */
 enum delta_result_type do_add_delta(LIBEVENT_THREAD *t, const char *key, const size_t nkey,
-                                    const bool incr, const int64_t delta,
+                                    const int opCode, const int64_t delta,
                                     char *buf, uint64_t *cas,
                                     const uint32_t hv,
                                     item **it_ret) {
@@ -2302,23 +2306,31 @@ enum delta_result_type do_add_delta(LIBEVENT_THREAD *t, const char *key, const s
         return NON_NUMERIC;
     }
 
-    if (incr) {
-        value += delta;
-        //MEMCACHED_COMMAND_INCR(c->sfd, ITEM_key(it), it->nkey, value);
-    } else {
+    if (opCode == 0) {
         if(delta > value) {
             value = 0;
         } else {
             value -= delta;
         }
         //MEMCACHED_COMMAND_DECR(c->sfd, ITEM_key(it), it->nkey, value);
+    } else if (opCode == 1) {
+        value += delta;
+        //MEMCACHED_COMMAND_INCR(c->sfd, ITEM_key(it), it->nkey, value);
+    } else if (opCode == 2) {
+        value *= delta;
+    } else if (opCode == 3) {
+        value /= delta;
     }
 
     pthread_mutex_lock(&t->stats.mutex);
-    if (incr) {
-        t->stats.slab_stats[ITEM_clsid(it)].incr_hits++;
-    } else {
+    if (opCode == 0) {
         t->stats.slab_stats[ITEM_clsid(it)].decr_hits++;
+    } else if (opCode == 1) {
+        t->stats.slab_stats[ITEM_clsid(it)].incr_hits++;
+    } else if (opCode == 2) {
+        t->stats.slab_stats[ITEM_clsid(it)].mult_hits++;
+    } else if (opCode == 3) {
+        t->stats.slab_stats[ITEM_clsid(it)].div_hits++;
     }
     pthread_mutex_unlock(&t->stats.mutex);
 

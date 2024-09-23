@@ -309,7 +309,9 @@ enum delta_result_type {
     X(cas_hits) \
     X(cas_badval) \
     X(incr_hits) \
-    X(decr_hits)
+    X(decr_hits) \
+    X(mult_hits) \
+    X(div_hits)
 
 /** Stats stored per slab (and per thread). */
 struct slab_stats {
@@ -328,6 +330,8 @@ struct slab_stats {
     X(delete_misses) \
     X(incr_misses) \
     X(decr_misses) \
+    X(mult_misses) \
+    X(div_misses) \
     X(cas_misses) \
     X(meta_cmds) \
     X(bytes_read) \
@@ -948,7 +952,7 @@ extern void *ext_storage;
 void verify_default(const char* param, bool condition);
 void do_accept_new_conns(const bool do_accept);
 enum delta_result_type do_add_delta(LIBEVENT_THREAD *t, const char *key,
-                                    const size_t nkey, const bool incr,
+                                    const size_t nkey, const int opCode,
                                     const int64_t delta, char *buf,
                                     uint64_t *cas, const uint32_t hv,
                                     item **it_ret);
@@ -995,7 +999,7 @@ void sidethread_conn_close(conn *c);
 
 /* Lock wrappers for cache functions that are called from main loop. */
 enum delta_result_type add_delta(LIBEVENT_THREAD *t, const char *key,
-                                 const size_t nkey, bool incr,
+                                 const size_t nkey, int opCode,
                                  const int64_t delta, char *buf,
                                  uint64_t *cas);
 void accept_new_conns(const bool do_accept);
